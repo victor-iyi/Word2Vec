@@ -49,7 +49,7 @@ class Word2Vec:
                     if context is not word:
                         data.append([word, context])
             if self.logging:
-                sys.stdout.write('\r{:,} of {:,} sentences.'.format(s+1, len(self._sentences)))
+                sys.stdout.write('\rProcessing {:,} of {:,} sentences.'.format(s+1, len(self._sentences)))
         # Xs and ys
         _X = []
         _y = []
@@ -57,9 +57,8 @@ class Word2Vec:
         for i, word_data in enumerate(data):
             _X.append(self.one_hot(self._word2id[ word_data[0] ]))
             _y.append(self.one_hot(self._word2id[ word_data[1] ]))
-            sys.stdout.write('\rProcessing {:,} of {:,}\tSo far = {}'.format(i+1, 
-                                                                             len(data), 
-                                                                             dt.datetime.now() - start_time))
+            sys.stdout.write('\rProcessing {:,} of {:,} features & labels\tSo far = {}'.format(
+                                                        i+1, len(data), dt.datetime.now() - start_time))
         # Convert Xs and ys to numpy array
         self._X = np.asarray(_X)
         self._y = np.asarray(_y)
@@ -68,9 +67,10 @@ class Word2Vec:
         self._index_in_epoch = 0
         
         # Free memory
-        del start_time
         del _X
         del _y
+        del data
+        del start_time
 
     def one_hot(self, idx):
         temp = np.zeros(shape=[self._vocab_size])
