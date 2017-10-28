@@ -60,8 +60,8 @@ class Word2Vec:
             sys.stdout.write('\rProcessing {:,} of {:,} features & labels\tSo far = {}'.format(
                                                         i+1, len(data), dt.datetime.now() - start_time))
         # Convert Xs and ys to numpy array
-        self._X = np.asarray(_X)
-        self._y = np.asarray(_y)
+        self._X = np.array(_X)
+        self._y = np.array(_y)
         self._num_examples = self._X.shape[0]
         self._epochs_completed = 0
         self._index_in_epoch = 0
