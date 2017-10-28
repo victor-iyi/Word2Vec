@@ -94,6 +94,14 @@ class Word2Vec:
         return self._vocab_size
     
     @property
+    def word2id(self):
+        return self._word2id
+    
+    @property
+    def id2word(self):
+        return self._id2word
+    
+    @property
     def epochs_completed(self):
         return self._epochs_completed
     
