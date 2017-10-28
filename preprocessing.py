@@ -13,4 +13,5 @@ from nltk import word_tokenize, sent_tokenize
 
 class WordFeatures():
     def __init__(self, file):
-        
+        pass
+    
