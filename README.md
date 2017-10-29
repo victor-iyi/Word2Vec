@@ -1,3 +1,3 @@
-# variational-auto-encoder [VAE]
+# Word2Vec
 
 ## by _Victor I. Afolabi_
