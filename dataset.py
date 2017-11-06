@@ -221,7 +221,7 @@ class ImageDataset(Dataset):
             img = img.flatten()
         return img
 
-    def _create_label(self, label):
+    def __create_label(self, label):
         hot = np.zeros(shape=[len(self._labels)], dtype=int)
         hot[self._labels.index(label)] = 1
         return hot
@@ -236,7 +236,7 @@ class ImageDataset(Dataset):
                 try:
                     image_file = os.path.join(image_dir, file)
                     img = self.__create_image(image_file)
-                    hot_label = self._create_label(label)
+                    hot_label = self.__create_label(label)
                     datasets.append([img, hot_label])
                 except Exception as e:
                     sys.stderr.write('{}'.format(e))
