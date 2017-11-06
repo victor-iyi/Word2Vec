@@ -36,8 +36,11 @@ class Dataset():
         dirs = save_file.split('/')
         if len(dirs) > 1 and not os.path.isdir('/'.join(dirs[:-1])):
             os.makedirs('/'.join(dirs[:-1]))
-        with open(save_file, 'wb') as f:
-            pickle.dump(obj=self, file=f)
+        f = open(save_file, mode='wb')
+        pickle.dump(self, f)
+        f.close()
+        # with open(save_file, 'wb') as f:
+        #     pickle.dump(obj=self, file=f)
 
     def load(self, save_file):
         """Load a saved Dataset object"""
@@ -155,7 +158,7 @@ class Dataset():
         return encoding
 
 
-# !--------------------------------------------------- Image Dataset ---------------------------------------------------! #
+# !-------------------------------------- Image Dataset --------------------------------------! #
 # `ImageDataset` class for image datasets
 class ImageDataset(Dataset):
     
@@ -207,12 +210,12 @@ class ImageDataset(Dataset):
         self._y = np.array([label for label in datasets[:,1]])
         del datasets  # free memory
 
-# !--------------------------------------------------- Text Dataset ---------------------------------------------------! #
+# !-------------------------------------- Text Dataset --------------------------------------! #
 # `TextDataset` for textual dataset
 class TextDataset(Dataset):
     def __init__(self, data_dir, window=2, max_word=None, **kwargs):
-        super().__init__(data_dir=data_dir, **kwargs)
-        self.window = window
+        super().__init__(data_dir, **kwargs)
+        self._window = window
         self._max_word = max_word
 
         # TODO: Look into `data_dir`. You may wanna get all files in there and read as a BIG corpus
@@ -264,8 +267,8 @@ class TextDataset(Dataset):
         start_time = dt.datetime.now()
         for s, sent in enumerate(self._sentences):
             for i, word in enumerate(sent):
-                start = max(i - self.window, 0)
-                end = min(self.window+i, len(sent)) + 1
+                start = max(i - self._window, 0)
+                end = min(self._window+i, len(sent)) + 1
                 word_window = sent[start:end]
                 for context in word_window:
                     if context is not word:
