@@ -10,9 +10,9 @@
 import os
 import sys
 import pickle
+import datetime as dt
 
 import numpy as np
-from PIL import Image
 
 
 # Base `Dataset` class
@@ -21,7 +21,13 @@ class Dataset():
         self._data_dir = data_dir
         # Keyword arguments
         self._logging = kwargs['logging'] if 'logging' in kwargs else True
-        
+    
+    def create(self):
+        """Create datasets"""
+        self._process()
+        self._num_examples = self._X.shape[0]
+        self._epochs_completed = 0
+        self._index_in_epoch = 0
     
     def save(self, save_file, force=False):
         """Saves the dataset object."""
@@ -34,6 +40,7 @@ class Dataset():
             pickle.dump(obj=self, file=f)
 
     def load(self, save_file):
+        """Load a saved Dataset object"""
         if not os.path.isfile(save_file):
             raise FileNotFoundError('{} was not found.'.format(save_file))
         with open(save_file, 'rb') as f:
@@ -41,6 +48,7 @@ class Dataset():
         return self
     
     def next_batch(self, batch_size, shuffle=True):
+        """Get the next batch in the dataset"""
         start = self._index_in_epoch
         # Shuffle for first epoch
         if self._epochs_completed == 0 and start == 0 and shuffle:
@@ -120,6 +128,10 @@ class Dataset():
         return self._num_examples
     
     @property
+    def index_in_epoch(self):
+        return self._index_in_epoch
+    
+    @property
     def num_classes(self):
         return len(self._labels)
     
@@ -127,19 +139,23 @@ class Dataset():
     def epochs_completed(self):
         return self._epochs_completed
     
+    def _process(self):
+        pass
+    
     def _create_label(self, label):
         hot = np.zeros(shape=[len(self._labels)], dtype=int)
         hot[self._labels.index(label)] = 1
         return hot
-        
     
     def _one_hot(self, arr):
         arr, uniques = list(arr), list(set(arr))
         encoding = np.zeros(shape=[len(arr), len(uniques)], dtype=np.int32)
         for i, a in enumerate(arr):
             encoding[i, uniques.index(a)] = 1.
+        return encoding
 
 
+# !--------------------------------------------------- Image Dataset ---------------------------------------------------! #
 # `ImageDataset` class for image datasets
 class ImageDataset(Dataset):
     
@@ -149,12 +165,6 @@ class ImageDataset(Dataset):
         self.flatten = flatten
         self.size = size
         self._labels = [l for l in os.listdir(self._data_dir) if l[0] is not '.']
-    
-    def create(self):
-        self._process()
-        self._num_examples = self._X.shape[0]
-        self._epochs_completed = 0
-        self._index_in_epoch =
 
     @property
     def images(self):
@@ -163,8 +173,12 @@ class ImageDataset(Dataset):
     @property
     def channels(self):
         return 1 if len(self._X[0].shape) <= 2 else self._X[0].shape[-1]
-        
+    
     def _process(self):
+        try:
+            from PIL import Image
+        except Exception as e:
+            raise ModuleNotFoundError('{}'.format(e))
         datasets = []
         for i, label in enumerate(self._labels):
             image_dir = os.path.join(self._data_dir, label)
@@ -191,13 +205,83 @@ class ImageDataset(Dataset):
         np.random.shuffle(datasets)
         self._X = np.array([img for img in datasets[:,0]])
         self._y = np.array([label for label in datasets[:,1]])
+        del datasets  # free memory
 
-
+# !--------------------------------------------------- Text Dataset ---------------------------------------------------! #
 # `TextDataset` for textual dataset
 class TextDataset(Dataset):
-    def __init__(self):
-        pass
+    def __init__(self, data_dir, window=2, max_word=None, **kwargs):
+        super().__init__(data_dir=data_dir, **kwargs)
+        self.window = window
+        self._max_word = max_word
 
+        # TODO: Look into `data_dir`. You may wanna get all files in there and read as a BIG corpus
+        corpus_text = open(self._data_dir, mode='r', encoding='utf-8').read()
+        if self._max_word:
+            corpus_text = corpus_text[:self._max_word]
+        corpus_text = corpus_text.lower()
+        # import nltk.word_tokenize, nltk.sent_tokenize
+        try:
+            from nltk import word_tokenize, sent_tokenize
+        except Exception as e:
+            raise ModuleNotFoundError('{}'.format(e))
+        # word2id & id2word
+        unique_words = set(word_tokenize(corpus_text))
+        self._vocab_size = len(unique_words)
+        self._word2id = {w: i for i, w in enumerate(unique_words)}
+        self._id2word = {i: w for i, w in enumerate(unique_words)}
+        
+        # Sentences
+        raw_sentences = sent_tokenize(corpus_text)
+        self._sentences = [word_tokenize(sent) for sent in raw_sentences]
+       
+        # Free some memory
+        del corpus_text
+        del unique_words
+        del raw_sentences
+    
+    @property
+    def vocab_size(self):
+        return self._vocab_size
+
+    @property
+    def word2id(self):
+        return self._word2id
+
+    @property
+    def id2word(self):
+        return self._id2word
+
+    @property
+    def sentences(self):
+        return self._sentences
+
+    def _process(self):
+        # Creatnig features & labels
+        self._X = np.zeros(shape=[len(self._sentences), self._vocab_size])
+        self._y = np.zeros(shape=[len(self._sentences), self._vocab_size])
+        
+        start_time = dt.datetime.now()
+        for s, sent in enumerate(self._sentences):
+            for i, word in enumerate(sent):
+                start = max(i - self.window, 0)
+                end = min(self.window+i, len(sent)) + 1
+                word_window = sent[start:end]
+                for context in word_window:
+                    if context is not word:
+                        # data.append([word, context])
+                        self._X[s] = self._one_hot(self._word2id[word])
+                        self._y[s] = self._one_hot(self._word2id[context])
+            if self._logging:
+                sys.stdout.write('\rProcessing {:,} of {:,} sentences. Time taken: {}'.format(s+1, len(self._sentences),
+                                                                                              dt.datetime.now() - start_time))
+        # Free memory
+        del start_time
+
+    def _one_hot(self, idx):
+        temp = np.zeros(shape=[self._vocab_size])
+        temp[idx] = 1.
+        return temp
 
 
 if __name__ == '__main__':

@@ -39,9 +39,11 @@ class Word2Vec:
         del corpus_text
         del unique_words
         del raw_sentences
-        ######################################## Maybe stop ########################################
-        # Building data
-        data = []
+        # Creatnig features & labels
+        self._X = np.zeros(shape=[len(self._sentences), self._vocab_size])
+        self._y = np.zeros(shape=[len(self._sentences), self._vocab_size])
+        
+        start_time = dt.datetime.now()
         for s, sent in enumerate(self._sentences):
             for i, word in enumerate(sent):
                 start = max(i - self.window, 0)
@@ -49,29 +51,16 @@ class Word2Vec:
                 word_window = sent[start:end]
                 for context in word_window:
                     if context is not word:
-                        data.append([word, context])
+                        # data.append([word, context])
+                        self._X[s] = self.one_hot(self._word2id[word])
+                        self._y[s] = self.one_hot(self._word2id[context])
             if self.logging:
-                sys.stdout.write('\rProcessing {:,} of {:,} sentences.'.format(s+1, len(self._sentences)))
-        # Xs and ys
-        _X = []
-        _y = []
-        start_time = dt.datetime.now()
-        for i, word_data in enumerate(data):
-            _X.append(self.one_hot(self._word2id[ word_data[0] ]))
-            _y.append(self.one_hot(self._word2id[ word_data[1] ]))
-            sys.stdout.write('\rProcessing {:,} of {:,} features & labels\tSo far = {}'.format(
-                                                        i+1, len(data), dt.datetime.now() - start_time))
-        # Convert Xs and ys to numpy array
-        self._X = np.array(_X)
-        self._y = np.array(_y)
+                sys.stdout.write('\rProcessing {:,} of {:,} sentences. Time taken: {}'.format(s+1, len(self._sentences),
+                                                                                              dt.datetime.now() - start_time))
         self._num_examples = self._X.shape[0]
         self._epochs_completed = 0
         self._index_in_epoch = 0
-        
         # Free memory
-        del _X
-        del _y
-        del data
         del start_time
 
     def one_hot(self, idx):
