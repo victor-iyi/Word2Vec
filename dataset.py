@@ -268,7 +268,6 @@ class TextDataset(Dataset):
         if self._max_word:
             corpus_text = corpus_text[:self._max_word]
         corpus_text = corpus_text.lower()
-        # import nltk.word_tokenize, nltk.sent_tokenize
         try:
             from nltk import word_tokenize, sent_tokenize
         except Exception as e:
