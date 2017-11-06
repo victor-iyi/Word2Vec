@@ -29,13 +29,14 @@ class Dataset(object):
         # Keyword arguments
         self._logging = kwargs['logging'] if 'logging' in kwargs else True
         # Computed for self.next_batch
-        self._num_examples = self._X.shape[0]
+        self._num_examples = 0
         self._epochs_completed = 0
         self._index_in_epoch = 0
 
     def create(self):
         """Create datasets"""
         self._process()
+        self._num_examples = self._X.shape[0]
 
     def save(self, save_file, force=False):
         """
@@ -195,7 +196,21 @@ class ImageDataset(Dataset):
         self.grayscale = grayscale
         self.flatten = flatten
         self.size = size
+
         self._labels = [l for l in os.listdir(self._data_dir) if l[0] is not '.']
+        try:
+            from PIL import Image
+        except Exception as e:
+            raise ModuleNotFoundError('{}'.format(e))
+        # First image
+        img_dir = os.path.join(self._data_dir, self._labels[0])
+        img_file = os.path.join(img_dir, os.listdir(img_dir)[1])
+        img = self.__create_image(img_file, return_obj=True)
+        self._channel = img.im.bands
+        # free memory
+        del img_dir
+        del img_file
+        del img
 
     @property
     def images(self):
@@ -205,7 +220,40 @@ class ImageDataset(Dataset):
     def channel(self):
         return self._channel
 
-    def __create_image(self, file):
+    def _process(self):
+        img_dirs = [os.path.join(self._data_dir, l) for l in self._labels]
+        total_images = sum([len(os.listdir(d)) for d in img_dirs])
+        if self.flatten:
+            self._X = np.zeros(shape=[total_images, self.size * self.size * self.channel])
+        else:
+            self._X = np.zeros(shape=[total_images, self.size, self.size, self.channel])
+        self._y = np.zeros(shape=[total_images, len(self._labels)])
+        # Free memory
+        del total_images
+        del img_dirs
+        counter = 0
+        for i, label in enumerate(self._labels):
+            image_dir = os.path.join(self._data_dir, label)
+            image_list = [d for d in os.listdir(image_dir) if d[0] is not '.']
+            for j, file in enumerate(image_list):
+                try:
+                    image_file = os.path.join(image_dir, file)
+                    img = self.__create_image(image_file)
+                    hot_label = self.__create_label(label)
+                    self._X[counter, :] = img
+                    self._y[counter, :] = hot_label
+                except Exception as e:
+                    sys.stderr.write('{}'.format(e))
+                    sys.stderr.flush()
+                finally:
+                    counter += 1
+                if self._logging:
+                    sys.stdout.write('\rProcessing {} of {} class labels & {} of {} images'.format(
+                        i + 1, len(self._labels), j + 1, len(image_list)))
+        # Free up memory
+        del counter
+
+    def __create_image(self, file, return_obj=False):
         try:
             from PIL import Image
         except Exception as e:
@@ -214,8 +262,9 @@ class ImageDataset(Dataset):
         img = img.resize((self.size, self.size))
         if self.grayscale:
             img = img.convert('L')
-        # TODO: Code smell! Reassigning self._channel every loop
-        self._channel = img.im.bands
+        if return_obj:
+            return img
+        # convert to np.array
         img = np.array(img, dtype=np.float32)
         if self.flatten:
             img = img.flatten()
@@ -225,32 +274,6 @@ class ImageDataset(Dataset):
         hot = np.zeros(shape=[len(self._labels)], dtype=int)
         hot[self._labels.index(label)] = 1
         return hot
-
-    def _process(self):
-        datasets = []
-        # total_images = sum([len(os.listdir(d)) for d in os.listdir(self._data_dir)])
-        for i, label in enumerate(self._labels):
-            image_dir = os.path.join(self._data_dir, label)
-            image_list = [d for d in os.listdir(image_dir) if d[0] is not '.']
-            for j, file in enumerate(image_list):
-                try:
-                    image_file = os.path.join(image_dir, file)
-                    img = self.__create_image(image_file)
-                    hot_label = self.__create_label(label)
-                    datasets.append([img, hot_label])
-                except Exception as e:
-                    sys.stderr.write('{}'.format(e))
-                    sys.stderr.flush()
-                if self._logging:
-                    sys.stdout.write('\rProcessing {} of {} class labels & {} of {} images'.format(
-                        i + 1, len(self._labels), j + 1, len(image_list)))
-        # dataset into features & labels
-        datasets = np.asarray(datasets)
-        np.random.shuffle(datasets)
-        self._X = np.array([img for img in datasets[:, 0]])
-        self._y = np.array([label for label in datasets[:, 1]])
-        del datasets  # free memory
-
 
 # !-------------------------------------- Text Dataset --------------------------------------! #
 # `TextDataset` for textual dataset
