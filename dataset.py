@@ -179,11 +179,6 @@ class Dataset(object):
     def _process(self):
         pass
 
-    def _create_label(self, label):
-        hot = np.zeros(shape=[len(self._labels)], dtype=int)
-        hot[self._labels.index(label)] = 1
-        return hot
-
     def _one_hot(self, arr):
         arr, uniques = list(arr), list(set(arr))
         encoding = np.zeros(shape=[len(arr), len(uniques)], dtype=np.int32)
@@ -207,29 +202,42 @@ class ImageDataset(Dataset):
         return self._X
 
     @property
-    def channels(self):
-        return 1 if len(self._X[0].shape) <= 2 else self._X[0].shape[-1]
+    def channel(self):
+        return self._channel
 
-    def _process(self):
+    def __create_image(self, file):
         try:
             from PIL import Image
         except Exception as e:
             raise ModuleNotFoundError('{}'.format(e))
+        img = Image.open(file)
+        img = img.resize((self.size, self.size))
+        if self.grayscale:
+            img = img.convert('L')
+        # TODO: Code smell! Reassigning self._channel every loop
+        self._channel = img.im.bands
+        img = np.array(img, dtype=np.float32)
+        if self.flatten:
+            img = img.flatten()
+        return img
+
+    def _create_label(self, label):
+        hot = np.zeros(shape=[len(self._labels)], dtype=int)
+        hot[self._labels.index(label)] = 1
+        return hot
+
+    def _process(self):
         datasets = []
+        # total_images = sum([len(os.listdir(d)) for d in os.listdir(self._data_dir)])
         for i, label in enumerate(self._labels):
             image_dir = os.path.join(self._data_dir, label)
             image_list = [d for d in os.listdir(image_dir) if d[0] is not '.']
             for j, file in enumerate(image_list):
                 try:
-                    path = os.path.join(image_dir, file)
-                    img = Image.open(path)
-                    img = img.resize((self.size, self.size))
-                    if self.grayscale:
-                        img = img.convert('L')
-                    img = np.array(img, dtype=np.float32)
-                    if self.flatten:
-                        img = img.flatten()
-                    datasets.append([img, self._create_label(label)])
+                    image_file = os.path.join(image_dir, file)
+                    img = self.__create_image(image_file)
+                    hot_label = self._create_label(label)
+                    datasets.append([img, hot_label])
                 except Exception as e:
                     sys.stderr.write('{}'.format(e))
                     sys.stderr.flush()
