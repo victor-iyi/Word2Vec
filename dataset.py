@@ -15,7 +15,13 @@ import datetime as dt
 import numpy as np
 
 
-# Base `Dataset` class
+
+################################################################################################
+# +———————————————————————————————————————————————————————————————————————————————————————————+
+# | Dataset
+# |     base dataset class
+# +———————————————————————————————————————————————————————————————————————————————————————————+
+################################################################################################
 class Dataset(object):
     def __init__(self, data_dir, **kwargs):
         """
@@ -48,7 +54,8 @@ class Dataset(object):
             force saving
         """
         if os.path.isfile(save_file) and not force:
-            raise FileExistsError('{} already exist. Set `force=True` to override.'.format(save_file))
+            raise FileExistsError(
+                '{} already exist. Set `force=True` to override.'.format(save_file))
         dirs = save_file.split('/')
         if len(dirs) > 1 and not os.path.isdir('/'.join(dirs[:-1])):
             os.makedirs('/'.join(dirs[:-1]))
@@ -108,7 +115,8 @@ class Dataset(object):
             start = 0
             self._index_in_epoch = batch_size - rest_examples
             end = self._index_in_epoch
-            features = np.concatenate((rest_features, self._X[start:end]), axis=0)
+            features = np.concatenate(
+                (rest_features, self._X[start:end]), axis=0)
             labels = np.concatenate((rest_labels, self._y[start:end]), axis=0)
             return features, labels
         else:
@@ -188,16 +196,21 @@ class Dataset(object):
         return encoding
 
 
-# !-------------------------------------- Image Dataset --------------------------------------! #
-# `ImageDataset` class for image datasets
+################################################################################################
+# +———————————————————————————————————————————————————————————————————————————————————————————+
+# | ImageDataset
+# |     for image datasets
+# +———————————————————————————————————————————————————————————————————————————————————————————+
+################################################################################################
 class ImageDataset(Dataset):
-    def __init__(self, data_dir, grayscale=False, flatten=False, size=50, **kwargs):
-        super().__init__(data_dir, **kwargs)
+    def __init__(self, grayscale=False, flatten=False, size=50, **kwargs):
+        super().__init__(**kwargs)
         self.grayscale = grayscale
         self.flatten = flatten
         self.size = size
 
-        self._labels = [l for l in os.listdir(self._data_dir) if l[0] is not '.']
+        self._labels = [l for l in os.listdir(
+            self._data_dir) if l[0] is not '.']
         try:
             from PIL import Image
         except Exception as e:
@@ -224,9 +237,11 @@ class ImageDataset(Dataset):
         img_dirs = [os.path.join(self._data_dir, l) for l in self._labels]
         total_images = sum([len(os.listdir(d)) for d in img_dirs])
         if self.flatten:
-            self._X = np.zeros(shape=[total_images, self.size * self.size * self.channel])
+            self._X = np.zeros(
+                shape=[total_images, self.size * self.size * self.channel])
         else:
-            self._X = np.zeros(shape=[total_images, self.size, self.size, self.channel])
+            self._X = np.zeros(
+                shape=[total_images, self.size, self.size, self.channel])
         self._y = np.zeros(shape=[total_images, len(self._labels)])
         # Free memory
         del total_images
@@ -275,14 +290,18 @@ class ImageDataset(Dataset):
         hot[self._labels.index(label)] = 1
         return hot
 
-# !-------------------------------------- Text Dataset --------------------------------------! #
-# `TextDataset` for textual dataset
+
+################################################################################################
+# +———————————————————————————————————————————————————————————————————————————————————————————+
+# | TextDataset: 
+# |     for textual dataset
+# +———————————————————————————————————————————————————————————————————————————————————————————+
+################################################################################################
 class TextDataset(Dataset):
-    def __init__(self, data_dir, window=2, max_word=None, **kwargs):
+    def __init__(self, window=2, max_word=None, **kwargs):
         """
         Dataset class for pre-processing textual data
 
-        :param data_dir: str
         :param window: int
             is the maximum distance between the current and predicted
             word within a sentence
@@ -290,7 +309,7 @@ class TextDataset(Dataset):
             Maximum number of words to be kept
         :param kwargs:
         """
-        super().__init__(data_dir, **kwargs)
+        super().__init__(**kwargs)
         self._window = window
         self._max_word = max_word
 
@@ -373,7 +392,9 @@ if __name__ == '__main__':
     # data = data.load(save_file.format(data.size))  # loads saved object
 
     # Split into training, testing & validation set.
-    X_train, y_train, X_test, y_test, X_val, y_val = data.train_test_split(test_size=0.2, valid_portion=0.1)
+    X_train, y_train, X_test, y_test, X_val, y_val = data.train_test_split(
+        test_size=0.2, valid_portion=0.1)
     # X_train, y_train, X_test, y_test = data.train_test_split(test_size=0.2)
 
-    print('\nTrain: X{}\tTest: y{}\tValid: X{}'.format(X_train.shape, y_test.shape, X_val.shape))
+    print('\nTrain: X{}\tTest: y{}\tValid: X{}'.format(
+        X_train.shape, y_test.shape, X_val.shape))
