@@ -7,16 +7,15 @@
   
   Copyright © 2017. Victor. All rights reserved.
 """
-import os
-import sys
-import pickle
-import tarfile
-import zipfile
-import urllib.request
 import datetime as dt
+import os
+import pickle
+import sys
+import tarfile
+import urllib.request
+import zipfile
 
 import numpy as np
-
 from nltk.tokenize import word_tokenize
 
 
@@ -65,8 +64,7 @@ class Dataset(object):
             force saving
         """
         if os.path.isfile(save_file) and not force:
-            raise FileExistsError(
-                '{} already exist. Set `force=True` to override.'.format(save_file))
+            raise FileExistsError(f'{save_file} already exist. Set `force=True` to override.')
         dirs = save_file.split('/')
         if len(dirs) > 1 and not os.path.isdir('/'.join(dirs[:-1])):
             os.makedirs('/'.join(dirs[:-1]))
@@ -84,7 +82,7 @@ class Dataset(object):
             saved instance of Dataset
         """
         if not os.path.isfile(save_file):
-            raise FileNotFoundError('{} was not found.'.format(save_file))
+            raise FileNotFoundError(f'{save_file} was not found.')
         with open(save_file, 'rb') as f:
             # noinspection PyMethodFirstArgAssignment
             self = pickle.load(file=f)
@@ -275,7 +273,7 @@ class Dataset(object):
         # Percentage completion.
         pct_complete = float(count * block_size) / total_size
         # Status-message. Note the \r which means the line should overwrite itself.
-        msg = "\r\t- Download progress: {:.2%}".format(pct_complete)
+        msg = f"\r\t- Download progress: {pct_complete:.2%}"
         # Print it.
         sys.stdout.write(msg)
         sys.stdout.flush()
@@ -295,7 +293,7 @@ class ImageDataset(Dataset):
     :param data_dir: str
 
     :param size: int default 50
-        Size of the image. The image will be resized
+        Size of the image. The image will be resize
         into (size, size). Resizing the image doesn't affect the
         image channels but it does affect the shape of the image.
 
@@ -311,8 +309,8 @@ class ImageDataset(Dataset):
     :param kwargs:
     """
 
-    def __init__(self, data_dir,  size=50, grayscale=False, flatten=True, **kwargs):
-        super().__init__(data_dir, **kwargs)
+    def __init__(self, size=50, grayscale=False, flatten=True, **kwargs):
+        super().__init__(**kwargs)
         self.size = size
         self.grayscale = grayscale
         self.flatten = flatten
@@ -322,7 +320,7 @@ class ImageDataset(Dataset):
         try:
             from PIL import Image
         except Exception as e:
-            raise ModuleNotFoundError('{}'.format(e))
+            raise ModuleNotFoundError(f'{e}')
         # First image
         img_dir = os.path.join(self._data_dir, self._labels[0])
         img_file = os.path.join(img_dir, os.listdir(img_dir)[1])
@@ -359,6 +357,7 @@ class ImageDataset(Dataset):
             image_dir = os.path.join(self._data_dir, label)
             image_list = [d for d in os.listdir(image_dir) if d[0] is not '.']
             for j, file in enumerate(image_list):
+                # noinspection PyBroadException
                 try:
                     image_file = os.path.join(image_dir, file)
                     img = self.__create_image(image_file)
@@ -366,13 +365,13 @@ class ImageDataset(Dataset):
                     self._X[counter, :] = img
                     self._y[counter, :] = hot_label
                 except Exception as e:
-                    sys.stderr.write('{}'.format(e))
+                    sys.stderr.write(f'{e}')
                     sys.stderr.flush()
                 finally:
                     counter += 1
                 if self._logging:
-                    sys.stdout.write('\rProcessing {} of {} class labels & {} of {} images'.format(
-                        i + 1, len(self._labels), j + 1, len(image_list)))
+                    sys.stdout.write(f'\rProcessing {i+1:,} of {len(self._labels):,} class labels'
+                                     f'\t{j+1:,} of {len(image_list):,} images')
         # Free up memory
         del counter
 
@@ -380,7 +379,7 @@ class ImageDataset(Dataset):
         try:
             from PIL import Image
         except Exception as e:
-            raise ModuleNotFoundError('{}'.format(e))
+            raise ModuleNotFoundError(f'{e}')
         img = Image.open(file)
         img = img.resize((self.size, self.size))
         if self.grayscale:
@@ -421,8 +420,8 @@ class TextDataset(Dataset):
     :param kwargs:
     """
 
-    def __init__(self, data_dir, window=2, max_word=None, **kwargs):
-        super().__init__(data_dir, **kwargs)
+    def __init__(self, window=2, max_word=None, **kwargs):
+        super().__init__(**kwargs)
         self._window = window
         self._max_word = max_word
 
@@ -434,7 +433,7 @@ class TextDataset(Dataset):
         try:
             from nltk import word_tokenize, sent_tokenize
         except Exception as e:
-            raise ModuleNotFoundError('{}'.format(e))
+            raise ModuleNotFoundError(f'{e}')
         # word2id & id2word
         unique_words = set(word_tokenize(corpus_text))
         self._vocab_size = len(unique_words)
@@ -484,8 +483,8 @@ class TextDataset(Dataset):
                         self._y[s] = self._one_hot(self._word2id[context])
             if self._logging:
                 sys.stdout.write(
-                    '\rProcessing {:,} of {:,} sentences. Time taken: {}'.format(s + 1, len(self._sentences),
-                                                                                 dt.datetime.now() - start_time))
+                    f'\rProcessing {s+1:,} of {len(self._sentences):,} sentences.'
+                    f'\tTime taken: {dt.datetime.now() - start_time}')
         # Free memory
         del start_time
 
@@ -512,14 +511,14 @@ class WordVectorization(Dataset):
         size of GloVe dimension to be used.
         'sm' => Small file containing 50-D
         'md' => Medium file containing 100-D
-        'lg' => Large file contianing 200-D
+        'lg' => Large file containing 200-D
         'xl' => Extra large file containing 300-D
 
     :param kwargs:
     """
 
-    def __init__(self, data_dir, size='sm', **kwargs):
-        super().__init__(data_dir, **kwargs)
+    def __init__(self, size='sm', **kwargs):
+        super().__init__(**kwargs)
         self._size = size
         self._glove_url = 'http://nlp.stanford.edu/data/glove.6B.zip'
         self._glove_dir = '.'.join(
@@ -533,7 +532,7 @@ class WordVectorization(Dataset):
                        os.path.join(self._glove_dir, 'glove.6B.300d.txt')]
         if self._size not in sizes:
             msg = "`size` attribute includes: 'sm', 'md', 'lg', 'xl' " \
-                    "for small, medium, large & extra-large respectively "
+                  "for small, medium, large & extra-large respectively "
             raise ValueError(msg)
         index = sizes.index(self._size)
         self._glove_file = GLOVE_FILES[index]
@@ -546,7 +545,7 @@ class WordVectorization(Dataset):
             if 'y' in confirm.lower():
                 self.maybe_download_and_extract(self._glove_url, download_dir=self._glove_dir, force=True)
             else:
-                sys.stderr.write('Acess denied! Download file to continue...')
+                sys.stderr.write('Access denied! Download file to continue...')
                 sys.stderr.flush()
                 raise FileNotFoundError(
                     f'{self.glove_file} was not found. Download file to continue...')
@@ -599,8 +598,7 @@ class WordVectorization(Dataset):
                 name, vector = line.split(' ', 1)
                 self._glove_vector[name] = np.fromstring(vector, sep=' ')
                 if self._logging:
-                    sys.stdout.write(
-                        '\rLoading {:,} of {:,}'.format(i + 1, len(lines)))
+                    sys.stdout.write(f'\rLoading {i+1:,} of {len(lines):,}')
         return
 
     @property
@@ -630,5 +628,4 @@ if __name__ == '__main__':
         test_size=0.2, valid_portion=0.1)
     # X_train, y_train, X_test, y_test = data.train_test_split(test_size=0.2)
 
-    print('\nTrain: X{}\tTest: y{}\tValid: X{}'.format(
-        X_train.shape, y_test.shape, X_val.shape))
+    print(f'\nTrain: X{X_train.shape}\tTest: y{y_test.shape}\tValid: X{X_val.shape}')
