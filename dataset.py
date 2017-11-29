@@ -10,30 +10,40 @@
 import os
 import sys
 import pickle
+import tarfile
+import zipfile
+import urllib.request
 import datetime as dt
 
 import numpy as np
 
+from nltk.tokenize import word_tokenize
 
 
 ################################################################################################
 # +———————————————————————————————————————————————————————————————————————————————————————————+
 # | Dataset
-# |     base dataset class
+# |     base dataset class.
 # +———————————————————————————————————————————————————————————————————————————————————————————+
 ################################################################################################
 class Dataset(object):
+    """
+    Dataset pre-processing base class
+
+    :param data_dir:
+        top level directory where data resides
+
+    :param kwargs:
+        `logging`: Feedback on background metrics
+    """
+
     def __init__(self, data_dir, **kwargs):
-        """
-        Dataset pre-processing class
-        :param data_dir:
-            top level directory where data resides
-        :param kwargs:
-            `logging`: Feedback on background metrics
-        """
         self._data_dir = data_dir
         # Keyword arguments
         self._logging = kwargs['logging'] if 'logging' in kwargs else True
+        # Features and labels
+        self._X = np.array([])
+        self._y = np.array([])
         # Computed for self.next_batch
         self._num_examples = 0
         self._epochs_completed = 0
@@ -50,6 +60,7 @@ class Dataset(object):
 
         :param save_file: str
             path to a pickle file
+
         :param force: bool
             force saving
         """
@@ -68,14 +79,70 @@ class Dataset(object):
 
         :param save_file:
             path to a pickle file
+
         :return: obj:
             saved instance of Dataset
         """
         if not os.path.isfile(save_file):
             raise FileNotFoundError('{} was not found.'.format(save_file))
         with open(save_file, 'rb') as f:
+            # noinspection PyMethodFirstArgAssignment
             self = pickle.load(file=f)
         return self
+
+    def maybe_download_and_extract(self, url, download_dir='downloads', force=False):
+        """
+        Download and extract the data if it doesn't already exist.
+        Assumes the url is a tar-ball file.
+
+        :param url:
+            Internet URL for the tar-file to download.
+            Example: "http://nlp.stanford.edu/data/glove.6B.zip"
+
+        :param download_dir:
+            Directory to download files.
+            Example: "datasets/GloVe/"
+
+        :param force: boolean default False
+            Force download even if the file already exists.
+
+        :return:
+            Nothing.
+        """
+
+        # Filename for saving the file downloaded from the internet.
+        # Use the filename from the URL and add it to the download_dir.
+        filename = url.split('/')[-1]
+        file_path = os.path.join(self._data_dir, filename)
+
+        # Check if the file already exists.
+        # If it exists then we assume it has also been extracted,
+        # otherwise we need to download and extract it now.
+        if not os.path.exists(file_path) or force:
+            # Check if the download directory exists, otherwise create it.
+            if not os.path.exists(self._data_dir):
+                os.makedirs(self._data_dir)
+
+            # Download the file from the internet.
+            file_path, _ = urllib.request.urlretrieve(url=url,
+                                                      filename=file_path,
+                                                      reporthook=self._print_download_progress)
+
+            print()
+            print("Download finished. Extracting files.")
+
+            if file_path.endswith(".zip"):
+                # Unpack the zip-file.
+                zipfile.ZipFile(file=file_path, mode="r").extractall(
+                    download_dir)
+            elif file_path.endswith((".tar.gz", ".tgz")):
+                # Unpack the tar-ball.
+                tarfile.open(name=file_path, mode="r:gz").extractall(
+                    download_dir)
+
+            print("Done.")
+        else:
+            print("Data has apparently already been downloaded and unpacked.")
 
     def next_batch(self, batch_size, shuffle=True):
         """
@@ -83,8 +150,10 @@ class Dataset(object):
 
         :param batch_size: int
             Number of batches to be retrieved
+
         :param shuffle: bool
             Randomly shuffle the batches returned
+
         :return:
             Returns `batch_size` batches
             features - np.array([batch_size, ?])
@@ -131,10 +200,12 @@ class Dataset(object):
         :param test_size: float, default 0.1
                     Size of the testing data in %.
                     Default is 0.1 or 10% of the dataset.
+
         :keyword valid_portion: float, None, default
                     Size of validation set in %.
                     This will be taking from training set
                     after splitting into training and testing set.
+
         :return:
             np.array of [train_X, train_y, test_X, test_y] if
             `valid_portion` is not set
@@ -160,6 +231,10 @@ class Dataset(object):
             return np.array([train_X, train_y, test_X, test_y, val_X, val_y])
 
         return np.array([train_X, train_y, test_X, test_y])
+
+    @property
+    def data_dir(self):
+        return self._data_dir
 
     @property
     def features(self):
@@ -195,6 +270,16 @@ class Dataset(object):
             encoding[i, uniques.index(a)] = 1.
         return encoding
 
+    @staticmethod
+    def _print_download_progress(count, block_size, total_size):
+        # Percentage completion.
+        pct_complete = float(count * block_size) / total_size
+        # Status-message. Note the \r which means the line should overwrite itself.
+        msg = "\r\t- Download progress: {:.2%}".format(pct_complete)
+        # Print it.
+        sys.stdout.write(msg)
+        sys.stdout.flush()
+
 
 ################################################################################################
 # +———————————————————————————————————————————————————————————————————————————————————————————+
@@ -202,12 +287,35 @@ class Dataset(object):
 # |     for image datasets
 # +———————————————————————————————————————————————————————————————————————————————————————————+
 ################################################################################################
+
 class ImageDataset(Dataset):
-    def __init__(self, grayscale=False, flatten=False, size=50, **kwargs):
-        super().__init__(**kwargs)
+    """
+    Dataset subclass for pre-processing image data
+
+    :param data_dir: str
+
+    :param size: int default 50
+        Size of the image. The image will be resized
+        into (size, size). Resizing the image doesn't affect the
+        image channels but it does affect the shape of the image.
+
+    :param grayscale: bool default False
+        Maybe convert the image to grayscale.
+        Note: the image channel will be 1 if converted to grayscale.
+
+    :param flatten: bool default True
+        Maybe flatten the image into a 1-D array. The `features`
+        shape will be moodified into (n, d) where n is `num_examples`
+        and d in the flattened dimension.
+
+    :param kwargs:
+    """
+
+    def __init__(self, data_dir,  size=50, grayscale=False, flatten=True, **kwargs):
+        super().__init__(data_dir, **kwargs)
+        self.size = size
         self.grayscale = grayscale
         self.flatten = flatten
-        self.size = size
 
         self._labels = [l for l in os.listdir(
             self._data_dir) if l[0] is not '.']
@@ -293,23 +401,28 @@ class ImageDataset(Dataset):
 
 ################################################################################################
 # +———————————————————————————————————————————————————————————————————————————————————————————+
-# | TextDataset: 
+# | TextDataset
 # |     for textual dataset
 # +———————————————————————————————————————————————————————————————————————————————————————————+
 ################################################################################################
 class TextDataset(Dataset):
-    def __init__(self, window=2, max_word=None, **kwargs):
-        """
-        Dataset class for pre-processing textual data
+    """
+    Dataset subclass for pre-processing textual data
 
-        :param window: int
-            is the maximum distance between the current and predicted
-            word within a sentence
-        :param max_word: int
-            Maximum number of words to be kept
-        :param kwargs:
-        """
-        super().__init__(**kwargs)
+    :param data_dir: str
+
+    :param window: int
+        is the maximum distance between the current and predicted
+        word within a sentence
+
+    :param max_word: int
+        Maximum number of words to be kept
+
+    :param kwargs:
+    """
+
+    def __init__(self, data_dir, window=2, max_word=None, **kwargs):
+        super().__init__(data_dir, **kwargs)
         self._window = window
         self._max_word = max_word
 
@@ -380,6 +493,127 @@ class TextDataset(Dataset):
         temp = np.zeros(shape=[self._vocab_size])
         temp[idx] = 1.
         return temp
+
+
+################################################################################################
+# +———————————————————————————————————————————————————————————————————————————————————————————+
+# | WordVectorization
+# |     for vectoring word dataset
+# +———————————————————————————————————————————————————————————————————————————————————————————+
+################################################################################################
+class WordVectorization(Dataset):
+    """
+    Dataset subclass for pre-processing textual data
+
+    :param data_dir: str
+        Dataset directory.
+
+    :param size: str default 'sm'
+        size of GloVe dimension to be used.
+        'sm' => Small file containing 50-D
+        'md' => Medium file containing 100-D
+        'lg' => Large file contianing 200-D
+        'xl' => Extra large file containing 300-D
+
+    :param kwargs:
+    """
+
+    def __init__(self, data_dir, size='sm', **kwargs):
+        super().__init__(data_dir, **kwargs)
+        self._size = size
+        self._glove_url = 'http://nlp.stanford.edu/data/glove.6B.zip'
+        self._glove_dir = '.'.join(
+            self._glove_url.split('/')[-1].split('.')[:-1])
+        self._glove_dir = os.path.join(self._data_dir, self._glove_dir)
+
+        sizes = ['sm', 'md', 'lg', 'xl']
+        GLOVE_FILES = [os.path.join(self._glove_dir, 'glove.6B.50d.txt'),
+                       os.path.join(self._glove_dir, 'glove.6B.100d.txt'),
+                       os.path.join(self._glove_dir, 'glove.6B.200d.txt'),
+                       os.path.join(self._glove_dir, 'glove.6B.300d.txt')]
+        if self._size not in sizes:
+            msg = "`size` attribute includes: 'sm', 'md', 'lg', 'xl' " \
+                    "for small, medium, large & extra-large respectively "
+            raise ValueError(msg)
+        index = sizes.index(self._size)
+        self._glove_file = GLOVE_FILES[index]
+
+        self._glove_vector = {}
+
+        # maybe download & extract file
+        if not os.path.isfile(self._glove_file):
+            confirm = input('Download glove file, 862MB? Y/n: ')
+            if 'y' in confirm.lower():
+                self.maybe_download_and_extract(self._glove_url, download_dir=self._glove_dir, force=True)
+            else:
+                sys.stderr.write('Acess denied! Download file to continue...')
+                sys.stderr.flush()
+                raise FileNotFoundError(
+                    f'{self.glove_file} was not found. Download file to continue...')
+        else:
+            print(
+                f'Apparently, `{self._glove_file}` has been downloaded and extracted.')
+
+    def _process(self):
+        # load GloVe word vectors
+        self._load_glove()
+        # Read dataset file(s)
+        # sentence tokenize contents
+        # convert sentences to vectors
+        # add to word vectors to features
+
+    def _sent2seq(self, sentence):
+        tokens = word_tokenize(sentence)
+        vectors = []
+        words = []
+        for token in tokens:
+            # noinspection PyBroadException
+            try:
+                vector = self._glove_vector[token.lower()]
+            except:
+                vector = self._glove_vector['unk']
+            vectors.append(vector)
+            words.append(token)
+        return np.asarray(vectors), words
+
+    def _visualize(self, sentence):
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as ticker
+
+        vectors, words = self._sent2seq(sentence)
+        mat = np.vstack(vectors)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        shown = ax.matshow(mat, aspect='auto')
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+        fig.colorbar(shown)
+
+        ax.set_yticklabels([''] + words)
+        plt.show()
+
+    def _load_glove(self):
+        with open(self._glove_file, mode='r', encoding='utf-8') as glove:
+            lines = glove.readlines()
+            for i, line in enumerate(lines):
+                name, vector = line.split(' ', 1)
+                self._glove_vector[name] = np.fromstring(vector, sep=' ')
+                if self._logging:
+                    sys.stdout.write(
+                        '\rLoading {:,} of {:,}'.format(i + 1, len(lines)))
+        return
+
+    @property
+    def glove_dir(self):
+        return self._glove_dir
+
+    @property
+    def glove_file(self):
+        return self._glove_file
+
+    @property
+    def glove_vector(self):
+        return self._glove_vector
 
 
 if __name__ == '__main__':
