@@ -478,7 +478,6 @@ class TextDataset(Dataset):
                 word_window = sent[start:end]
                 for context in word_window:
                     if context is not word:
-                        # data.append([word, context])
                         self._X[s] = self._one_hot(self._word2id[word])
                         self._y[s] = self._one_hot(self._word2id[context])
             if self._logging:
