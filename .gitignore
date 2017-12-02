@@ -10,16 +10,11 @@ __pycache__/
 
 
 ### JetBrains template
-.idea/
+.idea
 
 
 ### VisualStudioCode template
-.vscode/*
-#!.vscode/settings.json
-#!.vscode/tasks.json
-#!.vscode/launch.json
-#!.vscode/extensions.json
-
+.vscode
 
 ### macOS template
 # General
@@ -29,6 +24,4 @@ __pycache__/
 
 
 ### Daafiles
-models/
-# datasets/
-tensorboard/
+saved

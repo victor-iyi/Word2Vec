@@ -64,7 +64,8 @@ class Dataset(object):
             force saving
         """
         if os.path.isfile(save_file) and not force:
-            raise FileExistsError(f'{save_file} already exist. Set `force=True` to override.')
+            raise FileExistsError(
+                f'{save_file} already exist. Set `force=True` to override.')
         dirs = save_file.split('/')
         if len(dirs) > 1 and not os.path.isdir('/'.join(dirs[:-1])):
             os.makedirs('/'.join(dirs[:-1]))
@@ -542,7 +543,8 @@ class WordVectorization(Dataset):
         if not os.path.isfile(self._glove_file):
             confirm = input('Download glove file, 862MB? Y/n: ')
             if 'y' in confirm.lower():
-                self.maybe_download_and_extract(self._glove_url, download_dir=self._glove_dir, force=True)
+                self.maybe_download_and_extract(
+                    self._glove_url, download_dir=self._glove_dir, force=True)
             else:
                 sys.stderr.write('Access denied! Download file to continue...')
                 sys.stderr.flush()
@@ -627,4 +629,5 @@ if __name__ == '__main__':
         test_size=0.2, valid_portion=0.1)
     # X_train, y_train, X_test, y_test = data.train_test_split(test_size=0.2)
 
-    print(f'\nTrain: X{X_train.shape}\tTest: y{y_test.shape}\tValid: X{X_val.shape}')
+    print(
+        f'\nTrain: X{X_train.shape}\tTest: y{y_test.shape}\tValid: X{X_val.shape}')
