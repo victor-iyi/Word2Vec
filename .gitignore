@@ -25,4 +25,5 @@ __pycache__/
 
 ### Daafiles
 datasets
+datasets/wiki.valid.raw
 saved
