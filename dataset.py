@@ -563,11 +563,11 @@ class WordVectorization(Dataset):
         # sentence tokenize contents
         sentences = sent_tokenize(self._corpus)
         for i, sent in enumerate(sentences):
-            vector, words = self._sent2seq(sent)
+            vectors, words = self._sent2seq(sent)
             if i == 0:
-                self._X = vector
+                self._X = np.copy(vectors)
             else:
-                self._X = np.concatenate((self._X, vector), axis=0)
+                self._X = np.concatenate(([self._X], [vectors]))
             self._sentence_words.append(words)
             if self._logging:
                 sys.stdout.write(f'\rProcessing {i+1:,} of {len(sentences):,} sentences..')
@@ -575,7 +575,8 @@ class WordVectorization(Dataset):
         # convert sentences to vectors
         # add to word vectors to features
 
-    def _clean_words(self, words):
+    def _lookup(self, vector):
+        # Check for the word for the corresponding vector
         pass
 
     def _sent2seq(self, sentence):
