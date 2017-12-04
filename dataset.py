@@ -16,7 +16,7 @@ import urllib.request
 import zipfile
 
 import numpy as np
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import word_tokenize, sent_tokenize
 
 
 ################################################################################################
@@ -517,8 +517,9 @@ class WordVectorization(Dataset):
     :param kwargs:
     """
 
-    def __init__(self, size='sm', **kwargs):
+    def __init__(self, corpus, size='sm', **kwargs):
         super().__init__(**kwargs)
+        self._corpus = corpus
         self._size = size
         self._glove_url = 'http://nlp.stanford.edu/data/glove.6B.zip'
         self._glove_dir = '.'.join(
@@ -538,6 +539,7 @@ class WordVectorization(Dataset):
         self._glove_file = GLOVE_FILES[index]
 
         self._glove_vector = {}
+        self._sentence_words = []
 
         # maybe download & extract file
         if not os.path.isfile(self._glove_file):
@@ -559,8 +561,22 @@ class WordVectorization(Dataset):
         self._load_glove()
         # Read dataset file(s)
         # sentence tokenize contents
+        sentences = sent_tokenize(self._corpus)
+        for i, sent in enumerate(sentences):
+            vector, words = self._sent2seq(sent)
+            if i == 0:
+                self._X = vector
+            else:
+                self._X = np.concatenate((self._X, vector), axis=0)
+            self._sentence_words.append(words)
+            if self._logging:
+                sys.stdout.write(f'\rProcessing {i+1:,} of {len(sentences):,} sentences..')
+                sys.stdout.flush()
         # convert sentences to vectors
         # add to word vectors to features
+
+    def _clean_words(self, words):
+        pass
 
     def _sent2seq(self, sentence):
         tokens = word_tokenize(sentence)
