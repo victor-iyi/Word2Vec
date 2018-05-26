@@ -8,7 +8,6 @@
   Copyright © 2017. Victor. All rights reserved.
 """
 
-import sys
 import datetime as dt
 import multiprocessing
 
@@ -55,8 +54,10 @@ class Word2Vec:
                         self._X[s] = self.one_hot(self._word2id[word])
                         self._y[s] = self.one_hot(self._word2id[context])
             if self.logging:
-                sys.stdout.write('\rProcessing {:,} of {:,} sentences. Time taken: {}'.format(s+1, len(self._sentences),
-                                                                                              dt.datetime.now() - start_time))
+                print(('\rProcessing {:,} of {:,} sentences. '
+                      'Time taken: {}').format(s+1, len(self._sentences),
+                                               dt.datetime.now() - start_time),
+                      end='')
         self._num_examples = self._X.shape[0]
         self._epochs_completed = 0
         self._index_in_epoch = 0
@@ -220,10 +221,10 @@ class GensimWord2Vec:
         self._sentences = [word_tokenize(sent) for sent in raw_sentences]
         workers = multiprocessing.cpu_count()
         sg = 1 # 0 - CBOW while 1 - skip gram
-        self._model = w2v.Word2Vec(sentences=self._sentences, workers=workers, **kwargs)
+        self._model = w2v.Word2Vec(sentences=self._sentences,
+                                   workers=workers, **kwargs)
         # Free memory
-        del corpus
-        del raw_sentences
+        del corpus, raw_sentences
 
     # !- Properties
     @property
