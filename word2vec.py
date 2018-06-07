@@ -18,26 +18,30 @@ from nltk import word_tokenize, sent_tokenize
 
 
 class Word2Vec:
-    def __init__(self, filename, window=2, max_word=None, logging=True):
+    def __init__(self, filename, window=2, **kwargs):
         self.window = window
-        self.logging = logging
+        max_word = kwargs.get('max_word', None)
+        self.logging = kwargs.get('logging') or True
+        
         # Read corpus
         corpus_text = open(filename, mode='r', encoding='utf-8').read()
         if max_word:
             corpus_text = corpus_text[:max_word]
         corpus_text = corpus_text.lower()
+
         # word2id & id2word
         unique_words = set(word_tokenize(corpus_text))
         self._vocab_size = len(unique_words)
         self._word2id = {w: i for i, w in enumerate(unique_words)}
         self._id2word = {i: w for i, w in enumerate(unique_words)}
+
         # Sentences
         raw_sentences = sent_tokenize(corpus_text)
         self._sentences = [word_tokenize(sent) for sent in raw_sentences]
+
         # Free some memory
-        del corpus_text
-        del unique_words
-        del raw_sentences
+        del corpus_text, unique_words, raw_sentences
+        
         # Creatnig features & labels
         self._X = np.zeros(shape=[len(self._sentences), self._vocab_size])
         self._y = np.zeros(shape=[len(self._sentences), self._vocab_size])
@@ -58,11 +62,11 @@ class Word2Vec:
                       'Time taken: {}').format(s+1, len(self._sentences),
                                                dt.datetime.now() - start_time),
                       end='')
-        self._num_examples = self._X.shape[0]
-        self._epochs_completed = 0
-        self._index_in_epoch = 0
         # Free memory
         del start_time
+        
+        self._num_examples = self._X.shape[0]
+        self._epochs_completed = self._index_in_epoch = 0
 
     def one_hot(self, idx):
         temp = np.zeros(shape=[self._vocab_size])
